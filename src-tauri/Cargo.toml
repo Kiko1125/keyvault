@@ -1,0 +1,48 @@
+[package]
+name        = "keyvault"
+version     = "1.0.0"
+edition     = "2021"
+description = "KeyVault — 便携式本地密码管理器"
+authors     = ["KeyVault"]
+
+# ─── Build dependency (Tauri code-gen) ───────────────────────────────────────
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+# ─── Runtime dependencies ─────────────────────────────────────────────────────
+[dependencies]
+tauri      = { version = "2", features = [] }
+serde      = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Encryption
+aes-gcm  = "0.10"
+argon2   = "0.5"
+rand     = "0.8"
+base64   = { version = "0.21", features = ["std"] }
+hex      = "0.4"
+
+# Clipboard
+arboard  = "3"
+
+# Async runtime
+tokio    = { version = "1", features = ["full"] }
+
+# Time
+chrono   = { version = "0.4", features = ["serde"] }
+
+# Error handling
+thiserror = "1"
+
+# ─── Size-optimized release profile ──────────────────────────────────────────
+[profile.release]
+opt-level     = "z"    # Optimize for binary size
+lto           = true   # Link-time optimization (cross-crate inlining)
+codegen-units = 1      # Single unit = maximum optimization
+panic         = "abort" # Remove unwinding machinery (~10% size reduction)
+strip         = true   # Strip debug symbols from final binary
+
+# ─── Dev profile: fast compile ────────────────────────────────────────────────
+[profile.dev]
+opt-level = 0
+debug     = true

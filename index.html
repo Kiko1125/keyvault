@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>密钥保险库 · KeyVault</title>
+  <meta name="description" content="便携式本地密码管理器，AES-256-GCM 加密，零网络依赖。" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SCREEN 1 · SETUP (first-run, create master password)
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="screenSetup" class="auth-screen hidden">
+  <div class="auth-glow glow-a"></div>
+  <div class="auth-glow glow-b"></div>
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🔐</div>
+      <div class="auth-logo-title">KeyVault</div>
+      <div class="auth-logo-sub">首次使用 — 创建您的主密码</div>
+    </div>
+    <div class="auth-body">
+      <div class="form-group">
+        <label for="setupPwd">主密码</label>
+        <div class="pwd-wrap">
+          <input id="setupPwd" type="password" placeholder="至少 6 位，建议使用强密码" autocomplete="new-password" />
+          <button type="button" class="pwd-eye" data-target="setupPwd">👁️</button>
+        </div>
+        <div class="pwd-strength"><div class="pwd-strength-bar" id="setupPwdBar"></div></div>
+      </div>
+      <div class="form-group">
+        <label for="setupPwdConfirm">确认主密码</label>
+        <div class="pwd-wrap">
+          <input id="setupPwdConfirm" type="password" placeholder="再次输入相同密码" autocomplete="new-password" />
+          <button type="button" class="pwd-eye" data-target="setupPwdConfirm">👁️</button>
+        </div>
+      </div>
+      <div class="auth-warn">
+        ⚠️ 主密码<strong>无法找回</strong>，请务必牢记或安全备份。
+      </div>
+      <button id="setupBtn" class="btn btn-primary btn-full">创建保险库</button>
+    </div>
+    <div class="auth-footer">数据加密保存在 exe 同级目录 · 绝不联网</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SCREEN 2 · LOCK (enter master password to unlock)
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="screenLock" class="auth-screen hidden">
+  <div class="auth-glow glow-a"></div>
+  <div class="auth-glow glow-b"></div>
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-icon lock-bounce">🔒</div>
+      <div class="auth-logo-title">KeyVault</div>
+      <div class="auth-logo-sub">输入主密码以解锁</div>
+    </div>
+    <div class="auth-body">
+      <div class="form-group">
+        <label for="lockPwd">主密码</label>
+        <div class="pwd-wrap">
+          <input id="lockPwd" type="password" placeholder="请输入主密码" autocomplete="current-password" />
+          <button type="button" class="pwd-eye" data-target="lockPwd">👁️</button>
+        </div>
+      </div>
+      <div id="lockError" class="auth-error hidden"></div>
+      <button id="unlockBtn" class="btn btn-primary btn-full">
+        <span id="unlockBtnText">解锁</span>
+        <span id="unlockSpinner" class="spinner hidden"></span>
+      </button>
+    </div>
+    <div class="auth-footer">
+      <span id="exeDirLabel"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     SCREEN 3 · MAIN APP
+════════════════════════════════════════════════════════════════════════════ -->
+<div id="screenMain" class="hidden">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔐</div>
+      <span>KeyVault</span>
+    </div>
+    <div class="header-stats">
+      <div class="stat-badge">条目 <strong id="totalCount">0</strong></div>
+      <div class="stat-badge">分类 <strong id="catCount">0</strong></div>
+      <div class="stat-badge" id="idleBadge" title="5分钟无操作将自动锁定">
+        <span id="idleCountdown">5:00</span> 后锁定
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn btn-ghost btn-sm" id="settingsBtn" title="设置">⚙️ 设置</button>
+      <button class="btn btn-danger btn-sm" id="lockBtn" title="锁定">🔒 锁定</button>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input id="searchInput" type="text" placeholder="搜索名称、账号、网址…" autocomplete="off" />
+      </div>
+      <select id="typeFilter" class="filter-select">
+        <option value="">全部类型</option>
+        <option value="account">🔑 账号密码</option>
+        <option value="secure_note">📝 安全备忘录</option>
+        <option value="bank_card">💳 银行卡</option>
+      </select>
+      <select id="catFilter" class="filter-select">
+        <option value="">全部分类</option>
+      </select>
+      <button class="btn btn-ghost" id="importBtn">📥 导入</button>
+      <button class="btn btn-ghost" id="exportBtn">📤 导出</button>
+      <div class="add-menu-wrap">
+        <button class="btn btn-primary" id="addBtn">＋ 添加</button>
+        <div class="add-menu" id="addMenu">
+          <button class="add-menu-item" data-type="account">🔑 账号密码</button>
+          <button class="add-menu-item" data-type="secure_note">📝 安全备忘录</button>
+          <button class="add-menu-item" data-type="bank_card">💳 银行卡</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="category-tabs" id="categoryTabs"></div>
+    <div id="cardGrid"></div>
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL · Add / Edit Entry
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal" id="formModalInner">
+    <div class="modal-title">
+      <span id="modalTitleText">添加条目</span>
+      <button class="modal-close" id="cancelBtn">✕</button>
+    </div>
+
+    <!-- Type tabs (only shown when adding) -->
+    <div class="type-tabs" id="typeTabs">
+      <button class="type-tab active" data-type="account">🔑 账号密码</button>
+      <button class="type-tab" data-type="secure_note">📝 安全备忘录</button>
+      <button class="type-tab" data-type="bank_card">💳 银行卡</button>
+    </div>
+
+    <!-- Common fields -->
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fName">名称 *</label>
+        <input type="text" id="fName" placeholder="如 GitHub、招商银行" />
+      </div>
+      <div class="form-group">
+        <label for="fCategory">分类 *</label>
+        <input type="text" id="fCategory" placeholder="如 工作、银行" list="catList" />
+        <datalist id="catList"></datalist>
+      </div>
+    </div>
+
+    <!-- ACCOUNT fields -->
+    <div id="fieldsAccount">
+      <div class="form-group">
+        <label for="fUrl">网址 / 标识</label>
+        <input type="text" id="fUrl" placeholder="https://github.com" />
+      </div>
+      <div class="form-group">
+        <label for="fUsername">账号 / 邮箱 *</label>
+        <input type="text" id="fUsername" placeholder="user@example.com" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label for="fPassword">密码 *</label>
+        <div class="pwd-wrap">
+          <input type="password" id="fPassword" placeholder="请输入密码" autocomplete="new-password" />
+          <div class="pwd-actions">
+            <button type="button" id="togglePwd" title="显示/隐藏">👁️</button>
+            <button type="button" id="genPwd" title="生成随机密码">🎲</button>
+          </div>
+        </div>
+        <div class="pwd-strength"><div class="pwd-strength-bar" id="pwdBar"></div></div>
+      </div>
+      <div class="pwd-history-link hidden" id="historyLink">
+        <button type="button" id="viewHistoryBtn" class="link-btn">🕐 查看密码历史记录</button>
+      </div>
+    </div>
+
+    <!-- SECURE NOTE fields -->
+    <div id="fieldsNote" class="hidden">
+      <div class="form-group">
+        <label for="fNoteContent">备忘录内容 *</label>
+        <textarea id="fNoteContent" rows="6" placeholder="在此输入需要安全保存的内容…"></textarea>
+      </div>
+    </div>
+
+    <!-- BANK CARD fields -->
+    <div id="fieldsCard" class="hidden">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fBankName">发卡行</label>
+          <input type="text" id="fBankName" placeholder="如 招商银行" />
+        </div>
+        <div class="form-group">
+          <label for="fCardHolder">持卡人</label>
+          <input type="text" id="fCardHolder" placeholder="姓名拼音" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="fCardNumber">卡号 *</label>
+        <input type="text" id="fCardNumber" placeholder="0000 0000 0000 0000" maxlength="23" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="fCardExpiry">有效期</label>
+          <input type="text" id="fCardExpiry" placeholder="MM/YY" maxlength="5" />
+        </div>
+        <div class="form-group">
+          <label for="fCardCvv">CVV</label>
+          <div class="pwd-wrap">
+            <input type="password" id="fCardCvv" placeholder="•••" maxlength="4" autocomplete="off" />
+            <button type="button" class="pwd-eye" data-target="fCardCvv">👁️</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shared note -->
+    <div class="form-group">
+      <label for="fNote">备注</label>
+      <textarea id="fNote" placeholder="可选附加说明…" rows="2"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelBtn2">取消</button>
+      <button class="btn btn-primary" id="saveBtn">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL · Password History
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal modal-sm">
+    <div class="modal-title">
+      🕐 密码修改历史
+      <button class="modal-close" id="historyClose">✕</button>
+    </div>
+    <div id="historyList"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="historyClose2">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     MODAL · Settings
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal modal-sm">
+    <div class="modal-title">⚙️ 设置 <button class="modal-close" id="settingsClose">✕</button></div>
+    <h4 class="section-label">修改主密码</h4>
+    <div class="form-group">
+      <label for="sOldPwd">当前主密码</label>
+      <div class="pwd-wrap">
+        <input id="sOldPwd" type="password" placeholder="当前主密码" autocomplete="current-password" />
+        <button type="button" class="pwd-eye" data-target="sOldPwd">👁️</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="sNewPwd">新主密码</label>
+      <div class="pwd-wrap">
+        <input id="sNewPwd" type="password" placeholder="至少 6 位" autocomplete="new-password" />
+        <button type="button" class="pwd-eye" data-target="sNewPwd">👁️</button>
+      </div>
+      <div class="pwd-strength"><div class="pwd-strength-bar" id="sNewPwdBar"></div></div>
+    </div>
+    <div class="form-group">
+      <label for="sNewPwdConfirm">确认新密码</label>
+      <div class="pwd-wrap">
+        <input id="sNewPwdConfirm" type="password" placeholder="再次输入新密码" autocomplete="new-password" />
+        <button type="button" class="pwd-eye" data-target="sNewPwdConfirm">👁️</button>
+      </div>
+    </div>
+    <h4 class="section-label" style="margin-top:20px">数据位置</h4>
+    <div class="exe-dir-box" id="exeDirBox">—</div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="settingsClose2">取消</button>
+      <button class="btn btn-primary" id="changePwdBtn">更新密码</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     CONFIRM DIALOG
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="icon">🗑️</div>
+    <h3>确认删除？</h3>
+    <p id="confirmMsg">此操作无法撤销。</p>
+    <div class="actions">
+      <button class="btn btn-ghost" id="confirmNo">取消</button>
+      <button class="btn btn-danger" id="confirmYes">删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="importFile" accept=".json" style="display:none" />
+
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>
