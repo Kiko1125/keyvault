@@ -24,21 +24,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
         showToast(`初始化失败: ${e}`, 'error');
     }
-    
+
     // Global Event Listeners
     setupEventListeners();
 });
 
 function setupEventListeners() {
+    // Disable right-click context menu
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // Auth screens
     el('setupBtn').addEventListener('click', handleSetup);
     el('unlockBtn').addEventListener('click', handleUnlock);
-    
+
+    // Allow Enter key to unlock/setup
+    el('lockPwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleUnlock(); });
+    el('setupPwdConfirm').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSetup(); });
+
     // Main UI
     el('addBtn').addEventListener('click', () => {
         el('addMenu').classList.toggle('open');
     });
-    
+
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.add-menu-wrap')) {
             el('addMenu').classList.remove('open');
@@ -46,7 +53,7 @@ function setupEventListeners() {
         resetIdleTimer();
     });
     document.addEventListener('keypress', resetIdleTimer);
-    
+
     // Add menu items
     document.querySelectorAll('.add-menu-item').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -60,7 +67,7 @@ function setupEventListeners() {
     el('cancelBtn').addEventListener('click', closeFormModal);
     el('cancelBtn2').addEventListener('click', closeFormModal);
     el('saveBtn').addEventListener('click', handleSaveEntry);
-    
+
     document.querySelectorAll('.type-tab').forEach(tab => {
         tab.addEventListener('click', (e) => {
             if (editingId) return; // Prevent switching type while editing
@@ -79,9 +86,9 @@ function setupEventListeners() {
         el('fPassword').type = 'text';
         updatePwdStrength(el('fPassword'), el('pwdBar'));
     });
-    
+
     el('togglePwd').addEventListener('click', () => togglePwdVisibility('fPassword'));
-    
+
     document.querySelectorAll('.pwd-eye').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const targetId = e.currentTarget.getAttribute('data-target');
@@ -96,16 +103,47 @@ function setupEventListeners() {
 
     // Toolbar
     el('searchInput').addEventListener('input', renderCards);
-    el('typeFilter').addEventListener('change', renderCards);
-    el('catFilter').addEventListener('change', renderCards);
-    
+
+    // Custom dropdowns
+    document.querySelectorAll('.custom-dropdown').forEach(dd => {
+        const trigger = dd.querySelector('.dropdown-trigger');
+        const items = dd.querySelectorAll('.dropdown-item');
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close all other dropdowns
+            document.querySelectorAll('.custom-dropdown.open').forEach(other => {
+                if (other !== dd) other.classList.remove('open');
+            });
+            dd.classList.toggle('open');
+        });
+
+        items.forEach(item => {
+            item.addEventListener('click', () => {
+                items.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                dd.querySelector('.dropdown-text').textContent = item.textContent;
+                dd._value = item.getAttribute('data-value');
+                dd.classList.remove('open');
+                renderCards();
+            });
+        });
+    });
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.custom-dropdown')) {
+            document.querySelectorAll('.custom-dropdown.open').forEach(dd => dd.classList.remove('open'));
+        }
+    });
+
     el('lockBtn').addEventListener('click', lockVault);
     el('settingsBtn').addEventListener('click', () => el('settingsModal').classList.add('open'));
     el('settingsClose').addEventListener('click', () => el('settingsModal').classList.remove('open'));
     el('settingsClose2').addEventListener('click', () => el('settingsModal').classList.remove('open'));
-    
+
     el('changePwdBtn').addEventListener('click', handleChangePassword);
-    
+
     el('viewHistoryBtn').addEventListener('click', openHistoryModal);
     el('historyClose').addEventListener('click', () => el('historyModal').classList.remove('open'));
     el('historyClose2').addEventListener('click', () => el('historyModal').classList.remove('open'));
@@ -117,7 +155,7 @@ function setupEventListeners() {
     el('importBtn').addEventListener('click', () => el('importFile').click());
     el('importFile').addEventListener('change', handleImport);
     el('exportBtn').addEventListener('click', handleExport);
-    
+
     // Formats
     el('fCardNumber').addEventListener('input', (e) => {
         let val = e.target.value.replace(/\D/g, '');
@@ -151,10 +189,10 @@ function updatePwdStrength(input, barElement) {
 async function handleSetup() {
     const pwd = el('setupPwd').value;
     const confirm = el('setupPwdConfirm').value;
-    
+
     if (pwd.length < 6) return showToast('主密码至少需要 6 位字符', 'error');
     if (pwd !== confirm) return showToast('两次输入的密码不一致', 'error');
-    
+
     try {
         el('setupBtn').disabled = true;
         await invoke('setup_master_password', { password: pwd });
@@ -169,12 +207,12 @@ async function handleSetup() {
 async function handleUnlock() {
     const pwd = el('lockPwd').value;
     if (!pwd) return;
-    
+
     el('lockError').classList.add('hidden');
     el('unlockSpinner').classList.remove('hidden');
     el('unlockBtnText').classList.add('hidden');
     el('unlockBtn').disabled = true;
-    
+
     try {
         const data = await invoke('unlock_vault', { password: pwd });
         el('screenLock').classList.add('hidden');
@@ -217,13 +255,13 @@ function resetIdleTimer() {
 async function lockVault() {
     try {
         await invoke('lock_vault');
-    } catch(e) { console.error(e); }
-    
+    } catch (e) { console.error(e); }
+
     clearInterval(idleInterval);
     entries = [];
     el('screenMain').classList.add('hidden');
     el('screenLock').classList.remove('hidden');
-    
+
     // Clear modals
     el('formModal').classList.remove('open');
     el('settingsModal').classList.remove('open');
@@ -233,18 +271,54 @@ async function lockVault() {
 function updateCategories() {
     const cats = new Set(entries.map(e => e.category).filter(Boolean));
     const catArray = Array.from(cats).sort();
-    
-    // Update Filter Select
-    const filter = el('catFilter');
-    const currentVal = filter.value;
-    filter.innerHTML = '<option value="">全部分类</option>';
+
+    // Update Filter Dropdown
+    const catFilter = el('catFilter');
+    const currentCatVal = catFilter._value || '';
+    const catMenu = catFilter.querySelector('.dropdown-menu');
+    const catText = catFilter.querySelector('.dropdown-text');
+    catMenu.innerHTML = '';
+
+    const allOption = document.createElement('button');
+    allOption.className = `dropdown-item ${currentCatVal === '' ? 'active' : ''}`;
+    allOption.textContent = '全部分类';
+    allOption.setAttribute('data-value', '');
+    catMenu.appendChild(allOption);
+
+    let selectedCatText = '全部分类';
     catArray.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c; opt.textContent = c;
-        filter.appendChild(opt);
+        const opt = document.createElement('button');
+        opt.className = `dropdown-item ${currentCatVal === c ? 'active' : ''}`;
+        opt.textContent = c;
+        opt.setAttribute('data-value', c);
+        catMenu.appendChild(opt);
+        if (currentCatVal === c) selectedCatText = c;
     });
-    filter.value = currentVal;
-    
+    catText.textContent = selectedCatText;
+    catFilter._value = currentCatVal;
+
+    // Re-bind click handlers for catFilter items
+    const catItems = catMenu.querySelectorAll('.dropdown-item');
+    catItems.forEach(item => {
+        item.addEventListener('click', () => {
+            catItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            catText.textContent = item.textContent;
+            catFilter._value = item.getAttribute('data-value');
+            catFilter.classList.remove('open');
+
+            // Sync with category tabs
+            const selectedCat = item.getAttribute('data-value');
+            const tabs = el('categoryTabs');
+            tabs.querySelectorAll('.category-tab').forEach(tab => {
+                const tabCat = tab.textContent === '全部' ? '' : tab.textContent;
+                tab.classList.toggle('active', tabCat === selectedCat);
+            });
+
+            renderCards();
+        });
+    });
+
     // Update Datalist
     const datalist = el('catList');
     datalist.innerHTML = '';
@@ -253,7 +327,7 @@ function updateCategories() {
         opt.value = c;
         datalist.appendChild(opt);
     });
-    
+
     // Update Category Tabs
     const tabs = el('categoryTabs');
     const activeTab = tabs.querySelector('.active')?.textContent || '全部';
@@ -264,15 +338,27 @@ function updateCategories() {
         btn.textContent = c;
         tabs.appendChild(btn);
     });
-    
+
     tabs.querySelectorAll('.category-tab').forEach(t => {
         t.addEventListener('click', (e) => {
             tabs.querySelectorAll('.category-tab').forEach(btn => btn.classList.remove('active'));
             e.target.classList.add('active');
+
+            // Sync with dropdown
+            const clickedCat = e.target.textContent;
+            const catFilter = el('catFilter');
+            catFilter._value = clickedCat === '全部' ? '' : clickedCat;
+            catFilter.querySelector('.dropdown-text').textContent = clickedCat;
+
+            // Update dropdown active state
+            catFilter.querySelectorAll('.dropdown-item').forEach(item => {
+                item.classList.toggle('active', item.getAttribute('data-value') === (clickedCat === '全部' ? '' : clickedCat));
+            });
+
             renderCards();
         });
     });
-    
+
     el('catCount').textContent = catArray.length;
     el('totalCount').textContent = entries.length;
 }
@@ -280,49 +366,51 @@ function updateCategories() {
 function renderCards() {
     const grid = el('cardGrid');
     grid.innerHTML = '';
-    
+
     const search = el('searchInput').value.toLowerCase();
-    const typeF = el('typeFilter').value;
-    const catF = el('catFilter').value;
+    const typeF = el('typeFilter')._value || '';
+    const catF = el('catFilter')._value || '';
     const tabF = el('categoryTabs').querySelector('.active')?.textContent;
-    
+
     let filtered = entries.filter(e => {
         if (typeF && e.type !== typeF) return false;
         if (catF && e.category !== catF) return false;
         if (tabF && tabF !== '全部' && e.category !== tabF) return false;
-        
+
         if (search) {
-            const text = [e.name, e.category, e.url, e.username, e.note, e.note_content, e.bank_name].join(' ').toLowerCase();
+            const text = [e.name, e.category, e.url, e.username, e.note, e.note_content, e.bank_name, e.card_expiry, e.card_cvv].join(' ').toLowerCase();
             if (!text.includes(search)) return false;
         }
         return true;
     });
-    
+
     // Sort by created desc
     filtered.sort((a, b) => b.created_at - a.created_at);
-    
+
     filtered.forEach(entry => {
         const card = document.createElement('div');
         card.className = 'card';
         card.setAttribute('data-type', entry.type);
-        
+
         const typeIcon = entry.type === 'account' ? '🔑' : entry.type === 'secure_note' ? '📝' : '💳';
-        
+
         let bodyHtml = '';
         if (entry.type === 'account') {
             bodyHtml = `
-                ${entry.url ? `<div class="card-field"><span class="card-label">网址</span><span class="card-value" onclick="window.open('${entry.url.startsWith('http') ? entry.url : 'http://'+entry.url}')">${entry.url}</span></div>` : ''}
-                ${entry.username ? `<div class="card-field"><span class="card-label">账号</span><span class="card-value" onclick="copyText('${entry.username}')">${entry.username}</span></div>` : ''}
+                ${entry.url ? `<div class="card-field"><span class="card-label">网址</span><span class="card-value url-value" data-copy="${entry.url}" title="点击复制">${entry.url}</span></div>` : ''}
+                ${entry.username ? `<div class="card-field"><span class="card-label">账号</span><span class="card-value username-value" data-copy="${entry.username}" style="cursor:pointer" title="点击复制">${entry.username}</span></div>` : ''}
                 ${entry.password ? `<div class="card-field"><span class="card-label">密码</span><span class="card-value masked" id="pwd-${entry.id}">●●●●●●</span></div>` : ''}
             `;
         } else if (entry.type === 'secure_note') {
-            bodyHtml = `<div class="card-field" style="flex-direction:column; align-items:flex-start; max-height:80px; overflow:hidden;"><span class="card-value" style="text-align:left; white-space:normal; -webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical;">${entry.note_content || ''}</span></div>`;
+            bodyHtml = `<div class="card-field" style="flex-direction:column; align-items:flex-start; max-height:80px; overflow:hidden;"><span class="card-value" style="text-align:left; white-space:normal; -webkit-line-clamp: 3; display: -webkit-box; -webkit-box-orient: vertical; user-select:text;">${entry.note_content || ''}</span></div>`;
         } else if (entry.type === 'bank_card') {
             const maskedCard = entry.card_number ? `**** **** **** ${entry.card_number.slice(-4)}` : '';
+            const maskedCvv = entry.card_cvv ? '***' : '';
             bodyHtml = `
                 ${entry.bank_name ? `<div class="card-field"><span class="card-label">银行</span><span class="card-value">${entry.bank_name}</span></div>` : ''}
                 ${entry.card_number ? `<div class="card-field"><span class="card-label">卡号</span><span class="card-value masked" id="card-${entry.id}">${maskedCard}</span></div>` : ''}
-                ${entry.card_holder ? `<div class="card-field"><span class="card-label">持卡人</span><span class="card-value">${entry.card_holder}</span></div>` : ''}
+                ${entry.card_expiry ? `<div class="card-field"><span class="card-label">有效期</span><span class="card-value copy-value" data-copy="${entry.card_expiry}">${entry.card_expiry}</span></div>` : ''}
+                ${entry.card_cvv ? `<div class="card-field"><span class="card-label">CVV</span><span class="card-value masked" id="cvv-${entry.id}">${maskedCvv}</span></div>` : ''}
             `;
         }
 
@@ -340,13 +428,31 @@ function renderCards() {
             </div>
             <div class="card-body">
                 ${bodyHtml}
-                ${entry.note ? `<div style="font-size:12px; color:var(--text-muted); margin-top:8px;">备注: ${entry.note}</div>` : ''}
+                ${entry.note ? `<div class="card-note-text" style="font-size:12px; color:var(--text-muted); margin-top:8px; user-select:text; -webkit-user-select:text;">备注: ${entry.note}</div>` : ''}
             </div>
         `;
-        
+
         card.querySelector('.edit-btn').addEventListener('click', () => openFormModal(entry));
         card.querySelector('.del-btn').addEventListener('click', () => handleDelete(entry));
-        
+
+        // Copy url on click
+        const urlSpan = card.querySelector('.url-value');
+        if (urlSpan) {
+            urlSpan.addEventListener('click', () => copyText(urlSpan.getAttribute('data-copy')));
+        }
+
+        // Copy username on click
+        const userSpan = card.querySelector('.username-value');
+        if (userSpan) {
+            userSpan.addEventListener('click', () => copyText(userSpan.getAttribute('data-copy')));
+        }
+
+        // Copy expiry on click
+        const expirySpan = card.querySelector('.copy-value[data-copy]');
+        if (expirySpan) {
+            expirySpan.addEventListener('click', () => copyText(expirySpan.getAttribute('data-copy')));
+        }
+
         // Setup toggles
         if (entry.type === 'account' && entry.password) {
             const pwdSpan = card.querySelector(`#pwd-${entry.id}`);
@@ -374,6 +480,19 @@ function renderCards() {
                 }
             });
         }
+        if (entry.type === 'bank_card' && entry.card_cvv) {
+            const cvvSpan = card.querySelector(`#cvv-${entry.id}`);
+            cvvSpan.addEventListener('click', () => {
+                if (cvvSpan.classList.contains('masked')) {
+                    cvvSpan.textContent = entry.card_cvv;
+                    cvvSpan.classList.remove('masked');
+                    copyText(entry.card_cvv, true);
+                } else {
+                    cvvSpan.textContent = '***';
+                    cvvSpan.classList.add('masked');
+                }
+            });
+        }
 
         grid.appendChild(card);
     });
@@ -384,7 +503,7 @@ function switchType(type) {
     el('fieldsAccount').classList.add('hidden');
     el('fieldsNote').classList.add('hidden');
     el('fieldsCard').classList.add('hidden');
-    
+
     if (type === 'account') el('fieldsAccount').classList.remove('hidden');
     else if (type === 'secure_note') el('fieldsNote').classList.remove('hidden');
     else if (type === 'bank_card') el('fieldsCard').classList.remove('hidden');
@@ -393,22 +512,22 @@ function switchType(type) {
 function openFormModal(entry = null, defaultType = 'account') {
     editingId = entry ? entry.id : null;
     currentType = entry ? entry.type : defaultType;
-    
+
     // Reset form
     document.querySelectorAll('#formModalInner input, #formModalInner textarea').forEach(el => el.value = '');
     el('fPassword').type = 'password';
     el('fCardCvv').type = 'password';
     updatePwdStrength(el('fPassword'), el('pwdBar'));
-    
+
     if (entry) {
         el('modalTitleText').textContent = '编辑条目';
         el('typeTabs').classList.add('hidden');
         switchType(entry.type);
-        
+
         el('fName').value = entry.name || '';
         el('fCategory').value = entry.category || '';
         el('fNote').value = entry.note || '';
-        
+
         if (entry.type === 'account') {
             el('fUrl').value = entry.url || '';
             el('fUsername').value = entry.username || '';
@@ -437,7 +556,7 @@ function openFormModal(entry = null, defaultType = 'account') {
         switchType(defaultType);
         el('historyLink').classList.add('hidden');
     }
-    
+
     el('formModal').classList.add('open');
 }
 
@@ -448,9 +567,9 @@ function closeFormModal() {
 async function handleSaveEntry() {
     const name = el('fName').value.trim();
     const category = el('fCategory').value.trim() || '默认';
-    
+
     if (!name) return showToast('请输入名称', 'error');
-    
+
     let newEntry = {
         id: editingId || Math.random().toString(36).substr(2, 9),
         type: currentType,
@@ -459,20 +578,20 @@ async function handleSaveEntry() {
         note: el('fNote').value.trim() || null,
         created_at: Date.now()
     };
-    
+
     const oldEntry = editingId ? entries.find(e => e.id === editingId) : null;
     if (oldEntry) {
         newEntry.created_at = oldEntry.created_at;
         newEntry.updated_at = Date.now();
         newEntry.password_history = oldEntry.password_history || [];
     }
-    
+
     if (currentType === 'account') {
         newEntry.url = el('fUrl').value.trim() || null;
         newEntry.username = el('fUsername').value.trim() || null;
         const newPwd = el('fPassword').value;
         newEntry.password = newPwd || null;
-        
+
         if (oldEntry && oldEntry.password && oldEntry.password !== newPwd) {
             newEntry.password_history.unshift({
                 password: oldEntry.password,
@@ -493,14 +612,14 @@ async function handleSaveEntry() {
         newEntry.card_expiry = el('fCardExpiry').value.trim() || null;
         newEntry.card_cvv = el('fCardCvv').value.trim() || null;
     }
-    
+
     if (editingId) {
         const idx = entries.findIndex(e => e.id === editingId);
         if (idx !== -1) entries[idx] = newEntry;
     } else {
         entries.push(newEntry);
     }
-    
+
     try {
         await invoke('save_vault', { entries });
         showToast('保存成功', 'success');
@@ -515,11 +634,11 @@ async function handleSaveEntry() {
 function handleDelete(entry) {
     el('confirmMsg').textContent = `确定要删除 "${entry.name}" 吗？此操作无法恢复。`;
     el('confirmOverlay').classList.add('open');
-    
+
     const yesBtn = el('confirmYes');
     const newYes = yesBtn.cloneNode(true);
     yesBtn.parentNode.replaceChild(newYes, yesBtn);
-    
+
     newYes.addEventListener('click', async () => {
         entries = entries.filter(e => e.id !== entry.id);
         try {
@@ -537,10 +656,10 @@ function handleDelete(entry) {
 function openHistoryModal() {
     const entry = entries.find(e => e.id === editingId);
     if (!entry || !entry.password_history || entry.password_history.length === 0) return;
-    
+
     const list = el('historyList');
     list.innerHTML = '';
-    
+
     entry.password_history.forEach(h => {
         const div = document.createElement('div');
         div.className = 'history-item';
@@ -555,7 +674,7 @@ function openHistoryModal() {
         div.querySelector('button').addEventListener('click', () => copyText(h.password, true));
         list.appendChild(div);
     });
-    
+
     el('historyModal').classList.add('open');
 }
 
@@ -563,11 +682,11 @@ async function handleChangePassword() {
     const oldPwd = el('sOldPwd').value;
     const newPwd = el('sNewPwd').value;
     const confirm = el('sNewPwdConfirm').value;
-    
+
     if (!oldPwd) return showToast('请输入当前主密码', 'error');
     if (newPwd.length < 6) return showToast('新主密码至少需要 6 位', 'error');
     if (newPwd !== confirm) return showToast('新密码两次输入不一致', 'error');
-    
+
     try {
         el('changePwdBtn').disabled = true;
         await invoke('change_master_password', { oldPassword: oldPwd, newPassword: newPwd });
@@ -613,10 +732,10 @@ async function handleImport(e) {
 }
 
 async function handleExport() {
-    const defaultName = `keyvault_export_${new Date().toISOString().slice(0,10)}.json`;
+    const defaultName = `keyvault_export_${new Date().toISOString().slice(0, 10)}.json`;
     const path = prompt('请输入导出文件的绝对路径（如 C:\\Users\\Public\\backup.json）：\n\n警告：导出文件未加密，请妥善保管！', defaultName);
     if (!path) return;
-    
+
     try {
         await invoke('export_vault_json', { exportPath: path });
         showToast(`已导出至 ${path}`, 'success');

@@ -13,7 +13,7 @@
 
 use crate::models::Config;
 use std::{
-    io::{self, Write},
+    io::Write,
     path::PathBuf,
 };
 
