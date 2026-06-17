@@ -46,3 +46,7 @@ strip         = true   # Strip debug symbols from final binary
 [profile.dev]
 opt-level = 0
 debug     = true
+
+#便携版
+[package.metadata.tauri.bundle.windows.nsis]
+portable = true
