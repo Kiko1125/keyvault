@@ -1,9 +1,4 @@
 module.exports = {
-  files: [
-    'package.json',
-    'src-tauri/tauri.conf.json', 
-    'src-tauri/Cargo.toml'
-  ],
   bumpFiles: [
     {
       filename: 'package.json',
@@ -12,18 +7,11 @@ module.exports = {
     {
       filename: 'src-tauri/tauri.conf.json',
       type: 'json'
-    },
-    {
-      filename: 'src-tauri/Cargo.toml',
-      type: 'toml'
     }
   ],
   commit: true,
   tag: true,
-  push: true,
-  skip: {
-    tag: false
-  },
+  push: false,
   preset: 'conventionalcommits',
   types: [
     { type: 'feat', section: 'Features' },
