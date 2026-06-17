@@ -41,6 +41,15 @@ function setupEventListeners() {
     el('lockPwd').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleUnlock(); });
     el('setupPwdConfirm').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSetup(); });
 
+    // Reset vault (shown after failed unlock)
+    el('resetVaultBtn').addEventListener('click', () => {
+        el('resetConfirmOverlay').classList.add('open');
+    });
+    el('resetConfirmNo').addEventListener('click', () => {
+        el('resetConfirmOverlay').classList.remove('open');
+    });
+    el('resetConfirmYes').addEventListener('click', handleResetVault);
+
     // Main UI
     el('addBtn').addEventListener('click', () => {
         el('addMenu').classList.toggle('open');
@@ -217,14 +226,35 @@ async function handleUnlock() {
         const data = await invoke('unlock_vault', { password: pwd });
         el('screenLock').classList.add('hidden');
         el('lockPwd').value = '';
+        // Hide reset button in case it was shown from a previous failure
+        el('resetVaultBtn').classList.add('hidden');
         enterMainApp(data);
     } catch (e) {
         el('lockError').textContent = e;
         el('lockError').classList.remove('hidden');
+        // Reveal reset button after first failure
+        el('resetVaultBtn').classList.remove('hidden');
     } finally {
         el('unlockSpinner').classList.add('hidden');
         el('unlockBtnText').classList.remove('hidden');
         el('unlockBtn').disabled = false;
+    }
+}
+
+async function handleResetVault() {
+    el('resetConfirmOverlay').classList.remove('open');
+    try {
+        await invoke('reset_vault');
+        // Reset UI state
+        el('lockPwd').value = '';
+        el('lockError').classList.add('hidden');
+        el('resetVaultBtn').classList.add('hidden');
+        el('screenLock').classList.add('hidden');
+        el('screenMain').classList.add('hidden');
+        el('screenSetup').classList.remove('hidden');
+        showToast('保险库已重置，请创建新的主密码', 'info');
+    } catch (e) {
+        showToast(`重置失败: ${e}`, 'error');
     }
 }
 

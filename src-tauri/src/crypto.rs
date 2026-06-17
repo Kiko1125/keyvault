@@ -21,9 +21,9 @@ use argon2::{
 
 // ─── Argon2id parameters ──────────────────────────────────────────────────────
 // Moderate settings for a desktop app: ~256 ms on a modern CPU.
-const ARGON2_M_COST: u32 = 65_536;  // 64 MiB memory
+const ARGON2_M_COST: u32 = 32_768;  // 64 MiB memory
 const ARGON2_T_COST: u32 = 3;       // 3 iterations
-const ARGON2_P_COST: u32 = 1;       // 1 lane
+const ARGON2_P_COST: u32 = 2;       // 1 lane
 const KEY_LEN:       usize = 32;    // AES-256
 
 // ─── Argon2 instance builder ──────────────────────────────────────────────────

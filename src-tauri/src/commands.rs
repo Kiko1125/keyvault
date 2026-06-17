@@ -6,6 +6,7 @@
 //!   unlock_vault            → Vec<VaultEntry>
 //!   save_vault              → Ok / Err
 //!   lock_vault              → Ok / Err
+//!   reset_vault             → Ok / Err  (delete all vault files, return to setup)
 //!   change_master_password  → Ok / Err
 //!   copy_password           → Ok / Err  (starts 30-second clipboard clear)
 //!   get_exe_dir             → String
@@ -124,6 +125,31 @@ pub async fn save_vault(
 #[tauri::command]
 pub fn lock_vault(state: State<'_, AppState>) -> Result<(), String> {
     *locked_key(&state)? = None;
+    Ok(())
+}
+
+/// Delete all vault files on disk and clear the in-memory key.
+/// This is a destructive, irreversible operation — use only as a last resort
+/// when the user has forgotten their master password.
+#[tauri::command]
+pub fn reset_vault(state: State<'_, AppState>) -> Result<(), String> {
+    // Clear in-memory key first
+    if let Ok(mut key) = state.vault_key.lock() {
+        *key = None;
+    }
+
+    // Delete vault files (best-effort; ignore "not found" errors)
+    for path in [
+        storage::vault_path(),
+        storage::vault_bak_path(),
+        storage::config_path(),
+    ] {
+        if path.exists() {
+            std::fs::remove_file(&path)
+                .map_err(|e| format!("删除文件失败 {:?}: {e}", path))?;
+        }
+    }
+
     Ok(())
 }
 

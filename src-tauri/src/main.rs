@@ -41,6 +41,7 @@ fn main() {
             commands::unlock_vault,
             commands::save_vault,
             commands::lock_vault,
+            commands::reset_vault,
             commands::change_master_password,
             commands::copy_password,
             commands::get_exe_dir,

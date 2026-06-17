@@ -127,6 +127,37 @@ body {
   width: 100%;
 }
 
+/* Subtle destructive hint button shown after unlock failure */
+.btn-reset-hint {
+  width: 100%;
+  margin-top: 12px;
+  background-color: transparent;
+  color: var(--danger);
+  border: 1px solid rgba(218, 54, 51, 0.35);
+  font-size: 13px;
+  opacity: 0.8;
+  transition: var(--transition);
+}
+
+.btn-reset-hint:hover {
+  background-color: rgba(218, 54, 51, 0.10);
+  border-color: var(--danger);
+  opacity: 1;
+}
+
+/* Reset confirm dialog extras */
+.reset-confirm-box {
+  border-color: rgba(218, 54, 51, 0.5) !important;
+}
+
+.reset-warn-sub {
+  font-size: 0.8rem;
+  color: var(--danger);
+  margin-top: -8px;
+  margin-bottom: 20px;
+  opacity: 0.85;
+}
+
 /* ─── Forms ──────────────────────────────────────────────── */
 .form-group {
   margin-bottom: 16px;
@@ -160,6 +191,13 @@ textarea {
   font-family: inherit;
   font-size: 14px;
   transition: var(--transition);
+}
+
+/* Hide the native WebView2/Edge password-reveal and clear icons
+   so they don't clash with our custom 👁️ toggle button */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
 }
 
 select {

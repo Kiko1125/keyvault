@@ -78,6 +78,9 @@
           <span id="unlockBtnText">解锁</span>
           <span id="unlockSpinner" class="spinner hidden"></span>
         </button>
+        <button id="resetVaultBtn" class="btn btn-reset-hint hidden">
+          🗑️ 重置保险库
+        </button>
       </div>
       <div class="auth-footer">
         <span id="exeDirLabel"></span>
@@ -331,6 +334,20 @@
       <div class="actions">
         <button class="btn btn-ghost" id="confirmNo">取消</button>
         <button class="btn btn-danger" id="confirmYes">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset Vault Confirm Dialog -->
+  <div class="confirm-overlay" id="resetConfirmOverlay">
+    <div class="confirm-box reset-confirm-box">
+      <div class="icon">⚠️</div>
+      <h3 style="color: var(--danger)">重置保险库</h3>
+      <p>重置后，所有已保存的账号、密码与数据将被永久删除。</p>
+      <p class="reset-warn-sub">此操作不可撤销，请确认您已了解并同意。</p>
+      <div class="actions">
+        <button class="btn btn-ghost" id="resetConfirmNo">取消</button>
+        <button class="btn btn-danger" id="resetConfirmYes">确认重置</button>
       </div>
     </div>
   </div>
