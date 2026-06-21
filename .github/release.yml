@@ -1,15 +1,14 @@
 changelog:
   exclude:
-    # 过滤 standard-version 自动生成的版本提交
     messages: ["chore(release):*"]
   categories:
     - title: 🐛 Bug Fixes
       commit_types: ["fix"]
     - title: ✨ New Features
       commit_types: ["feat"]
-    - title: ⚙️ Chores & Maintenance
-      commit_types: ["chore", "build"]
     - title: 🔨 Refactor & Optimize
       commit_types: ["refactor", "perf"]
+    - title: ⚙️ Chores & Maintenance
+      commit_types: ["chore", "build", "ci"]
     - title: 📄 Documentation
       commit_types: ["docs"]
