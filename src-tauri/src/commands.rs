@@ -254,11 +254,12 @@ pub async fn export_vault_json(
         .map_err(|e| format!("导出失败: {e}"))
 }
 
-/// Import entries from a previously exported plain-text JSON file.
+/// Import entries from previously exported plain-text JSON content.
+/// The JSON string is passed directly from the frontend (file read via JS FileReader).
 /// Merges by ID (skips duplicates).
 #[tauri::command]
 pub async fn import_vault_json(
-    import_path: String,
+    json_content: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<VaultEntry>, String> {
     // Load current vault
@@ -267,10 +268,8 @@ pub async fn import_vault_json(
     let plaintext = crypto::decrypt(&key, &raw)?;
     let mut vault: Vault = serde_json::from_slice(&plaintext).map_err(|e| e.to_string())?;
 
-    // Parse import file
-    let import_bytes = std::fs::read(&import_path)
-        .map_err(|e| format!("读取导入文件失败: {e}"))?;
-    let import_vault: Vault = serde_json::from_slice(&import_bytes)
+    // Parse import content
+    let import_vault: Vault = serde_json::from_str(&json_content)
         .map_err(|e| format!("导入文件格式错误: {e}"))?;
 
     // Merge (skip existing IDs)

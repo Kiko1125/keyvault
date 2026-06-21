@@ -747,9 +747,17 @@ async function copyText(text, isPassword = false) {
 async function handleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Read file content via FileReader (file.path is unavailable in Tauri v2 for security)
+    const jsonContent = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target.result);
+        reader.onerror = () => reject(new Error('读取文件失败'));
+        reader.readAsText(file, 'utf-8');
+    });
+
     try {
-        // file.path contains the absolute path in Tauri
-        const updatedEntries = await invoke('import_vault_json', { importPath: file.path });
+        const updatedEntries = await invoke('import_vault_json', { jsonContent });
         const addedCount = updatedEntries.length - entries.length;
         entries = updatedEntries;
         showToast(`成功导入 ${addedCount} 个新条目`, 'success');
