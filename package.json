@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "release": "standard-version && node sync-version.js"
+    "release": "node sync-version.js && standard-version"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
